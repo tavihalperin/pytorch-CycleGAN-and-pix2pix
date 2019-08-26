@@ -281,10 +281,7 @@ class DilatedResnetGeneratorF(nn.Module):
 
         super(DilatedResnetGeneratorF, self).__init__()
 
-        use_bias = isinstance(norm_layer, Identity)
-        print('norm layer type')
-        print(type(norm_layer))
-        exit()
+        use_bias = isinstance(norm_layer(0), Identity)
 
         self.layer1 = [nn.ReflectionPad2d(3),
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
@@ -351,9 +348,9 @@ class DilatedResnetGenerator(nn.Module):
         model = []
         dilations = [1, 2, 4]
         for dilation in dilations:
-            model += [ResnetBlock(ngf, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            model += [ResnetBlock(ngf, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias, dilation=dilation)]
 
-        model += [nn.ReflectionPad2d(1)]
+        model += [nn.ReflectionPad2d(2)]
         model += [nn.Conv2d(ngf, ngf//2, kernel_size=3, padding=0, dilation=2)]
         model += [norm_layer(ngf//2)]
         model += [nn.ReLU(True)]
@@ -399,9 +396,9 @@ class ResnetBlock(nn.Module):
         conv_block = []
         p = 0
         if padding_type == 'reflect':
-            padding_layer = nn.ReflectionPad2d(1)
+            padding_layer = nn.ReflectionPad2d(dilation)
         elif padding_type == 'replicate':
-            padding_layer = nn.ReplicationPad2d(1)
+            padding_layer = nn.ReplicationPad2d(dilation)
         elif padding_type == 'zero':
             padding_layer = None
             p = 1
@@ -455,7 +452,7 @@ class NLayerDiscriminator(nn.Module):
         kw = 4
         padw = 0#1
         sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
-                    n.LeakyReLU(0.2, True)]
+                    nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         # nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
