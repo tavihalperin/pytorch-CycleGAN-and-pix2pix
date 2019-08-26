@@ -108,6 +108,8 @@ class PairedCycleGANModel(BaseModel):
         self.reference = input['reference'].to(self.device)
         self.real_A = input['A'].to(self.device)
         self.real_B = input['B'].to(self.device)
+        self.reference_B = input['B_ref'].to(self.device)
+        #TODO for now will use 2 eyes from same person
         self.image_paths = input['A_paths']
 
     def forward(self):
