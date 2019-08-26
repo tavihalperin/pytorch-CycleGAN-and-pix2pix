@@ -64,7 +64,9 @@ def get_params(opt, size):
     w, h = size
     new_h = h
     new_w = w
-    if opt.preprocess == 'resize_and_crop':
+    if opt.preprocess == 'rotate':
+        deg = random.randint(-30, 30)
+    elif opt.preprocess == 'resize_and_crop':
         new_h = new_w = opt.load_size
     elif opt.preprocess == 'scale_width_and_crop':
         new_w = opt.load_size
@@ -75,7 +77,7 @@ def get_params(opt, size):
 
     flip = random.random() > 0.5
 
-    return {'crop_pos': (x, y), 'flip': flip}
+    return {'crop_pos': (x, y), 'flip': flip, 'rotate' : deg}
 
 
 def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
@@ -88,6 +90,8 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
     elif 'scale_width' in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, method)))
 
+    if 'rotate' in opt.preprocess:
+        transform_list.append(transforms.RandomRotation(opt.rotation_angle))
     if 'crop' in opt.preprocess:
         if params is None:
             transform_list.append(transforms.RandomCrop(opt.crop_size))
@@ -146,6 +150,8 @@ def __flip(img, flip):
         return img.transpose(Image.FLIP_LEFT_RIGHT)
     return img
 
+def __rotate(img, deg):
+    return img.rotate(deg)
 
 def __print_size_warning(ow, oh, w, h):
     """Print warning information about image size(only print once)"""
