@@ -36,9 +36,11 @@ class PairedCycleGANModel(BaseModel):
         Identity loss (optional): lambda_identity * (||G_A(B) - B|| * lambda_B + ||G_B(A) - A|| * lambda_A) (Sec 5.2 "Photo generation from paintings" in the paper)
         Dropout is not used in the original CycleGAN paper.
         """
-        parser.set_defaults(no_dropout=True)  # default CycleGAN did not use dropout
+#         parser.set_defaults(no_dropout=True)  # default CycleGAN did not use dropout
+        parser.add_argument('--dataset_mode', type=str, default='paired_unaligned')
         if is_train:
             parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
+            parser.add_argument('--lambda_style', type=float, default=1.0, help='style consistency loss')
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
 
@@ -71,7 +73,7 @@ class PairedCycleGANModel(BaseModel):
         # Code (vs. paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
         self.netG_A = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
-        self.netG_B = networks.define_G(opt.output_nc, opt.input_nc, opt.ngf, opt.netG, opt.norm,
+        self.netG_B = networks.define_F(opt.output_nc, opt.input_nc, opt.ngf, opt.netG, opt.norm,
                                         not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
 
         if self.isTrain:  # define discriminators
@@ -105,10 +107,10 @@ class PairedCycleGANModel(BaseModel):
         The option 'direction' can be used to swap domain A and domain B.
         """
         assert self.opt.direction == 'AtoB'
-        self.reference = input['reference'].to(self.device)
+#         self.reference = input['B_ref'].to(self.device)
         self.real_A = input['A'].to(self.device)
         self.real_B = input['B'].to(self.device)
-        self.reference_B = input['B_ref'].to(self.device)
+        self.ref_B = input['B_ref'].to(self.device)
         #TODO for now will use 2 eyes from same person
         self.image_paths = input['A_paths']
 
@@ -144,11 +146,11 @@ class PairedCycleGANModel(BaseModel):
     def backward_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
         # B_reference should be the same style
-        fake_B, real_B_same_style = self.fake_B_pool.query(self.fake_B.detach())
+        fake_B, ref_B = self.fake_B_pool.query([self.fake_B.detach(), self.ref_B])
         self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B)
 
-        self.loss_D_style = self.backward_D_style([self.real_B, self.reference_B],
-                                                  [fake_B, real_B_same_style])
+        self.loss_D_style = self.backward_D_style([self.real_B,self.ref_B], 
+                                                  [fake_B, ref_B])
 
     def backward_D_style(self, real_pair, fake_pair):
         # Real
@@ -176,14 +178,13 @@ class PairedCycleGANModel(BaseModel):
         # Identity loss
         if lambda_idt > 0:
             # G_B should be identity if real_A is fed: ||G_B(A) - A||
-            self.idt_B = self.netG_B(self.real_A)
-            self.loss_idt_B = self.criterionIdt(self.idt_B, self.real_A) * lambda_A * lambda_idt
+            self.idt_A = self.netG_B(self.real_A)
+            self.loss_idt_A = self.criterionIdt(self.idt_A, self.real_A) * lambda_A * lambda_idt
         else:
-            self.loss_idt_B = 0
+            self.loss_idt_A = 0
 
-        self.loss_G_style = self.criterionGAN(self.netD_style(torch.cat([self.fake_B,
-                                                                         self.real_B]),
-                                                              True)) * self.opt.lambda_style
+        self.loss_style_B = self.criterionGAN(
+            self.netD_style(torch.cat([self.fake_B, self.real_B], dim=1)), True) * self.opt.lambda_style
         # GAN loss D_A(G_A(A))
         self.loss_G_A = self.criterionGAN(self.netD_A(self.fake_B), True)
         # GAN loss D_B(G_B(B))
@@ -191,10 +192,10 @@ class PairedCycleGANModel(BaseModel):
         # Forward cycle loss || G_B(G_A(A)) - A||
         self.loss_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
         # Backward cycle loss || G_A(G_B(B)) - B||
-        self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * lambda_B
+        self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * self.opt.lambda_B
         # combined loss and calculate gradients
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + \
-                      self.loss_G_style + self.loss_idt_B
+                      self.loss_style_B + self.loss_idt_A
         self.loss_G.backward()
 
     def optimize_parameters(self):

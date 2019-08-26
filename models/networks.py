@@ -116,21 +116,21 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_G(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True, init_type='normal', init_gain=0.02, gpu_ids=[]):
     norm_layer = get_norm_layer(norm_type=norm)
 
     net = DilatedResnetGeneratorG(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, padding_type='reflect')
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_F(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_F(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True, init_type='normal', init_gain=0.02, gpu_ids=[]):
     norm_layer = get_norm_layer(norm_type=norm)
 
     net = DilatedResnetGeneratorF(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, padding_type='reflect')
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_D(input_nc, ndf, netD, n_layers_D=3, norm='instance', init_type='normal', init_gain=0.02, gpu_ids=[]):
     """Create a discriminator
 
     Parameters:
@@ -304,11 +304,11 @@ class DilatedResnetGeneratorG(nn.Module):
         use_bias = isinstance(norm_layer, Identity)
 
         self.layer1a = [nn.ReflectionPad2d(3),
-                        nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                        nn.Conv2d(input_nc, ngf//2, kernel_size=7, padding=0, bias=use_bias),
                         norm_layer(ngf),
                         nn.ReLU(True)]
         self.layer1b = [nn.ReflectionPad2d(3),
-                        nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                        nn.Conv2d(input_nc, ngf//2, kernel_size=7, padding=0, bias=use_bias),
                         norm_layer(ngf),
                         nn.ReLU(True)]
         self.layer1a = nn.Sequential(*self.layer1a)
@@ -472,10 +472,14 @@ class NLayerDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+#         sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
+        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=3, stride=1, padding=padw)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
 
     def forward(self, input):
         """Standard forward."""
+#         print(input.shape)
+#         print(self.model(input).shape)
+#         exit()
         return self.model(input)
 
