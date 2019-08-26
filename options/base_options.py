@@ -45,7 +45,7 @@ class BaseOptions():
         parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
         parser.add_argument('--load_size', type=int, default=256, help='scale images to this size')
         parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
-        parser.add_argument('--rotation_angle', type=int, default=30, help='then crop to this '
+        parser.add_argument('--rotation_angle', type=int, default=20, help='then crop to this '
                                                                             'size')
         parser.add_argument('--max_dataset_size', type=int, default=float("inf"), help='Maximum number of samples allowed per dataset. If the dataset directory contains more than max_dataset_size, only a subset is loaded.')
         parser.add_argument('--preprocess', type=str, default='rotate', help='scaling and cropping '

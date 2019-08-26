@@ -91,7 +91,8 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
         transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, method)))
 
     if 'rotate' in opt.preprocess:
-        transform_list.append(transforms.RandomRotation(opt.rotation_angle))
+#         transform_list.append(transforms.RandomRotation(opt.rotation_angle))
+        transform_list.append(transforms.Lambda(lambda img: __rotate(img, opt.rotation_angle)))
     if 'crop' in opt.preprocess:
         if params is None:
             transform_list.append(transforms.RandomCrop(opt.crop_size))
@@ -151,7 +152,7 @@ def __flip(img, flip):
     return img
 
 def __rotate(img, deg):
-    return img.rotate(deg)
+    return img.rotate(deg, fillcolor=img.getpixel((0,0)))
 
 def __print_size_warning(ow, oh, w, h):
     """Print warning information about image size(only print once)"""
