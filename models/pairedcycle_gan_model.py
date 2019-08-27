@@ -43,6 +43,8 @@ class PairedCycleGANModel(BaseModel):
             parser.add_argument('--lambda_style', type=float, default=1.0, help='style consistency loss')
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
+            parser.add_argument('--with_idt_B', action='store_true', help='use identity for B '
+                                                                          'domain')
 
         return parser
 
@@ -55,11 +57,15 @@ class PairedCycleGANModel(BaseModel):
         BaseModel.__init__(self, opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = ['D_A', 'G_A', 'cycle_A', 'idt_A', 'D_B', 'G_B', 'cycle_B', 'style_B']
+        if self.opt.with_idt_B:
+            self.loss_names.append('idt_B')
         # specify the images you want to save/display. The training/test scripts will call <BaseModel.get_current_visuals>
         visual_names_A = ['real_A', 'fake_B', 'rec_A', 'ref_B']
         visual_names_B = ['real_B', 'fake_A', 'rec_B']
         if self.isTrain and self.opt.lambda_identity > 0.0:  # if identity loss is used, we also visualize idt_B=G_A(B) ad idt_A=G_A(B)
             visual_names_A.append('idt_A')
+            if self.opt.with_idt_B:
+                visual_names_A.append('idt_B')
 
         self.visual_names = visual_names_A + visual_names_B  # combine visualizations for A and B
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>.
@@ -119,7 +125,7 @@ class PairedCycleGANModel(BaseModel):
         self.fake_B = self.netG_A(self.real_A, self.real_B)  # G_A(A)
         self.rec_A = self.netG_B(self.fake_B)   # G_B(G_A(A))
         self.fake_A = self.netG_B(self.real_B)  # G_B(B)
-        self.rec_B = self.netG_A(self.fake_A, self.fake_B)   # G_A(G_B(B))
+        self.rec_B = self.netG_A(self.fake_A, self.ref_B)   # G_A(G_B(B))
 
     def backward_D_basic(self, netD, real, fake):
         """Calculate GAN loss for the discriminator
@@ -146,11 +152,11 @@ class PairedCycleGANModel(BaseModel):
     def backward_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
         # B_reference should be the same style
-        fake_B, ref_B = self.fake_B_pool.query([self.fake_B.detach(), self.ref_B])
+        fake_B, ref_B_for_fake = self.fake_B_pool.query([self.fake_B.detach(), self.ref_B])
         self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B)
 
-        self.loss_D_style = self.backward_D_style([self.real_B,self.ref_B], 
-                                                  [fake_B, ref_B])
+        self.loss_D_style = self.backward_D_style([self.real_B, self.ref_B],
+                                                  [fake_B, ref_B_for_fake])
 
     def backward_D_style(self, real_pair, fake_pair):
         # Real
@@ -176,10 +182,15 @@ class PairedCycleGANModel(BaseModel):
         lambda_idt = self.opt.lambda_identity
         lambda_A = self.opt.lambda_A
         # Identity loss
+        self.loss_idt_B = 0
         if lambda_idt > 0:
             # G_B should be identity if real_A is fed: ||G_B(A) - A||
             self.idt_A = self.netG_B(self.real_A)
             self.loss_idt_A = self.criterionIdt(self.idt_A, self.real_A) * lambda_A * lambda_idt
+            if self.opt.with_idt_B:
+                self.idt_B = self.netG_A(self.real_B, self.ref_B)
+                self.loss_idt_B = self.criterionIdt(self.idt_B, self.real_B) * self.opt.lambda_B * \
+                                  lambda_idt
         else:
             self.loss_idt_A = 0
 
@@ -195,7 +206,7 @@ class PairedCycleGANModel(BaseModel):
         self.loss_cycle_B = self.criterionCycle(self.rec_B, self.real_B) * self.opt.lambda_B
         # combined loss and calculate gradients
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cycle_A + self.loss_cycle_B + \
-                      self.loss_style_B + self.loss_idt_A
+                      self.loss_style_B + self.loss_idt_A + self.loss_idt_B
         self.loss_G.backward()
 
     def optimize_parameters(self):
