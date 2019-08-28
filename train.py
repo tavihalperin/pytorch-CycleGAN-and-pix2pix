@@ -23,7 +23,28 @@ from options.train_options import TrainOptions
 from data import create_dataset
 from models import create_model
 from util.visualizer import Visualizer
+from collections import defaultdict
+# import numpy as np
 
+def cvnrg_linechart(chart_name, key, value, group=None):
+   if group is None:
+       print("cnvrg_linechart_{} key: '{}' value: '{}'".format(chart_name.replace(' ','_'), key, value))
+   else:
+       print("cnvrg_linechart_{} group: '{}' key: '{}' value: '{}'\n".format(chart_name.replace(' ','_'), group, key, value))
+
+
+def cnvrg_plot(losses, epoch):
+    for loss in losses:
+        cnvrg_linechart(loss, key=epoch, value=losses[loss])
+    # cvnrg_linechart('D loss', key=epoch, value=d_loss[0])
+    # cvnrg_linechart('D acc', key=epoch, value=100 * d_loss[1])
+    # cvnrg_linechart('G loss - avg', key=epoch, value=g_loss[0])
+    # cvnrg_linechart('G loss', group='adv', key=epoch, value=np.mean(g_loss[1:3]))
+    # cvnrg_linechart('G loss', group='recon', key=epoch, value=np.mean(g_loss[3:5]))
+    # cvnrg_linechart('G loss', group='same', key=epoch, value=np.mean(g_loss[5:7]))
+    
+    
+    
 if __name__ == '__main__':
     opt = TrainOptions().parse()   # get training options
     dataset = create_dataset(opt)  # create a dataset given opt.dataset_mode and other options
@@ -34,12 +55,24 @@ if __name__ == '__main__':
     model.setup(opt)               # regular setup: load and print networks; create schedulers
     visualizer = Visualizer(opt)   # create a visualizer that display/save images and plots
     total_iters = 0                # the total number of training iterations
+    
+    def add_losses(sum, losses):
+        for k in losses.keys():
+            sum[k] = sum[k] + losses[k]
+        return sum
+
+    def div_losses(sum, num_losses):
+        for k in sum.keys():
+            sum[k] = sum[k] / num_losses
+        return sum
 
     for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):    # outer loop for different epochs; we save the model by <epoch_count>, <epoch_count>+<save_latest_freq>
         epoch_start_time = time.time()  # timer for entire epoch
         iter_data_time = time.time()    # timer for data loading per iteration
         epoch_iter = 0                  # the number of training iterations in current epoch, reset to 0 every epoch
-
+        iters_count_for_losses_sum = 0
+        losses_sum = defaultdict(lambda : 0)
+        
         for i, data in enumerate(dataset):  # inner loop within one epoch
             iter_start_time = time.time()  # timer for computation per iteration
             if total_iters % opt.print_freq == 0:
@@ -49,14 +82,16 @@ if __name__ == '__main__':
             epoch_iter += opt.batch_size
             model.set_input(data)         # unpack data from dataset and apply preprocessing
             model.optimize_parameters()   # calculate loss functions, get gradients, update network weights
-
+            losses = model.get_current_losses()
+            losses_sum = add_losses(losses_sum, losses)
+            iters_count_for_losses_sum += 1
+            
             if total_iters % opt.display_freq == 0:   # display images on visdom and save images to a HTML file
                 save_result = total_iters % opt.update_html_freq == 0
                 model.compute_visuals()
                 visualizer.display_current_results(model.get_current_visuals(), epoch, save_result)
 
             if total_iters % opt.print_freq == 0:    # print training losses and save logging information to the disk
-                losses = model.get_current_losses()
                 t_comp = (time.time() - iter_start_time) / opt.batch_size
                 visualizer.print_current_losses(epoch, epoch_iter, losses, t_comp, t_data)
                 if opt.display_id > 0:
@@ -68,6 +103,9 @@ if __name__ == '__main__':
                 model.save_networks(save_suffix)
 
             iter_data_time = time.time()
+            
+        losses_sum = div_losses(losses_sum, iters_count_for_losses_sum)
+        
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
