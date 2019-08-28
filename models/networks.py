@@ -116,17 +116,21 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_G(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True,
+             init_type='normal', init_gain=0.02, gpu_ids=[], res=True):
     norm_layer = get_norm_layer(norm_type=norm)
 
-    net = DilatedResnetGeneratorG(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, padding_type='reflect')
+    net = DilatedResnetGeneratorG(input_nc, output_nc, ngf, norm_layer=norm_layer,
+                                  use_dropout=use_dropout, padding_type='reflect', res=res)
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_F(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True, init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_F(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True,
+             init_type='normal', init_gain=0.02, gpu_ids=[], res=True):
     norm_layer = get_norm_layer(norm_type=norm)
 
-    net = DilatedResnetGeneratorF(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, padding_type='reflect')
+    net = DilatedResnetGeneratorF(input_nc, output_nc, ngf, norm_layer=norm_layer,
+                                  use_dropout=use_dropout, padding_type='reflect', res=res)
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
@@ -277,12 +281,12 @@ def cal_gradient_penalty(netD, real_data, fake_data, device, type='mixed', const
 
 class DilatedResnetGeneratorF(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=128, norm_layer=nn.BatchNorm2d, use_dropout=True,
-                 padding_type='reflect'):
+                 padding_type='reflect', res=True):
 
         super(DilatedResnetGeneratorF, self).__init__()
 
         use_bias = isinstance(norm_layer(0), Identity)
-
+        self.no_res = not res
         self.layer1 = [nn.ReflectionPad2d(3),
                  nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
@@ -293,16 +297,19 @@ class DilatedResnetGeneratorF(nn.Module):
 
     def forward(self, input):
         x = self.layer1(input)
+        if self.no_res:
+            return self.model(x)
         return input + self.model(x)
 
 class DilatedResnetGeneratorG(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=128, norm_layer=nn.BatchNorm2d, use_dropout=True,
-                 padding_type='reflect'):
+                 padding_type='reflect', res=True):
 
         super(DilatedResnetGeneratorG, self).__init__()
 
         use_bias = isinstance(norm_layer, Identity)
 
+        self.no_res = not res
         self.layer1a = [nn.ReflectionPad2d(3),
                         nn.Conv2d(input_nc, ngf//2, kernel_size=7, padding=0, bias=use_bias),
                         norm_layer(ngf),
@@ -320,6 +327,8 @@ class DilatedResnetGeneratorG(nn.Module):
         x = self.layer1a(source)
         y = self.layer1b(reference)
         x = torch.cat([x,y], dim=1)
+        if self.no_res:
+            return self.model(x)
         return source + self.model(x)
 
 
