@@ -189,13 +189,12 @@ class PairedCycleGANModel(BaseModel):
             self.loss_idt_A = self.criterionIdt(self.idt_A, self.real_A) * lambda_A * lambda_idt
             if self.opt.with_idt_B:
                 self.idt_B = self.netG_A(self.real_B, self.ref_B)
-                self.loss_idt_B = self.criterionIdt(self.idt_B, self.real_B) * self.opt.lambda_B * \
-                                  lambda_idt
+                self.loss_idt_B = self.criterionIdt(self.idt_B, self.real_B) * self.opt.lambda_B * lambda_idt
         else:
             self.loss_idt_A = 0
 
         self.loss_style_B = self.criterionGAN(
-            self.netD_style(torch.cat([self.fake_B, self.real_B], dim=1)), True) * self.opt.lambda_style
+            self.netD_style(torch.cat([self.fake_B, self.ref_B], dim=1)), True) * self.opt.lambda_style
         # GAN loss D_A(G_A(A))
         self.loss_G_A = self.criterionGAN(self.netD_A(self.fake_B), True)
         # GAN loss D_B(G_B(B))
