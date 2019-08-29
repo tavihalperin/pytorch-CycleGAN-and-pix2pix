@@ -104,8 +104,8 @@ if __name__ == '__main__':
 
             iter_data_time = time.time()
             
-        losses_sum = div_losses(losses_sum, iters_count_for_losses_sum)
-        
+        losses_mean = div_losses(losses_sum, iters_count_for_losses_sum)
+        cnvrg_plot(losses_mean, epoch)
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
