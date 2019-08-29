@@ -1,6 +1,6 @@
 import torch
 import itertools
-from util.image_pool import ImagePool
+from util.image_pool import ImagePool, ImagePoolPairs
 from .base_model import BaseModel
 from . import networks
 
@@ -95,7 +95,8 @@ class PairedCycleGANModel(BaseModel):
                                             self.gpu_ids)
 
             self.fake_A_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
-            self.fake_B_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
+            self.fake_B_pool = ImagePoolPairs(opt.pool_size)  # create image buffer to store
+            # previously generated images
             # define loss functions
             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
             self.criterionCycle = torch.nn.L1Loss()
@@ -154,7 +155,7 @@ class PairedCycleGANModel(BaseModel):
     def backward_D_A(self):
         """Calculate GAN loss for discriminator D_A"""
         # B_reference should be the same style
-        fake_B, ref_B_for_fake = self.fake_B_pool.query([self.fake_B.detach(), self.ref_B])
+        fake_B, ref_B_for_fake = self.fake_B_pool.query([[self.fake_B.detach(), self.ref_B]])
         self.loss_D_A = self.backward_D_basic(self.netD_A, self.real_B, fake_B)
 
         self.loss_D_style = self.backward_D_style([self.real_B, self.ref_B],

@@ -88,7 +88,6 @@ class ImagePoolPairs:
             return image_pairs
         return_images = []
         for image_pair in image_pairs:
-            image_pair = [torch.unsqueeze(im.data, 0) for im in image_pair]
             if self.num_imgs < self.pool_size:   # if the buffer is not full; keep inserting current images to the buffer
                 self.num_imgs = self.num_imgs + 1
                 self.images.append(image_pair)
