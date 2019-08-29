@@ -26,7 +26,8 @@ from util.visualizer import Visualizer
 from collections import defaultdict
 # import numpy as np
 
-def cvnrg_linechart(chart_name, key, value, group=None):
+
+def cnvrg_linechart(chart_name, key, value, group=None):
    if group is None:
        print("cnvrg_linechart_{} key: '{}' value: '{}'".format(chart_name.replace(' ','_'), key, value))
    else:
