@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
-
+from torch.nn.utils.spectral_norm import SpectralNorm
 
 ###############################################################################
 # Helper Functions
@@ -27,7 +27,7 @@ def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True, track_running_stats=True)
     elif norm_type == 'instance':
-        norm_layer = functools.partial(nn.InstanceNorm2d, affine=False, track_running_stats=False)
+        norm_layer = functools.partial(nn.InstanceNorm2d, affine=True, track_running_stats=False)
     elif norm_type == 'none':
         norm_layer = lambda x: Identity()
     else:
@@ -134,7 +134,8 @@ def define_F(input_nc, output_nc, ngf, netG, norm='instance', use_dropout=True,
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_D(input_nc, ndf, netD, n_layers_D=3, norm='instance', init_type='normal', init_gain=0.02, gpu_ids=[]):
+def define_D(input_nc, ndf, netD, n_layers_D=3, norm='instance', init_type='normal',
+             init_gain=0.02, gpu_ids=[], with_specnorm=False):
     """Create a discriminator
 
     Parameters:
@@ -166,7 +167,8 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='instance', init_type='norm
     """
     norm_layer = get_norm_layer(norm_type=norm)
 
-    net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
+    net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer,
+                              with_specnorm=with_specnorm)
 
     return init_net(net, init_type, init_gain, gpu_ids)
 
@@ -442,7 +444,8 @@ class ResnetBlock(nn.Module):
 class NLayerDiscriminator(nn.Module):
     """Defines a PatchGAN discriminator"""
 
-    def __init__(self, input_nc, ndf=64, n_layers=6, norm_layer=nn.BatchNorm2d):
+    def __init__(self, input_nc, ndf=64, n_layers=6, norm_layer=nn.BatchNorm2d,
+                 with_specnorm=False):
         """Construct a PatchGAN discriminator
 
         Parameters:
@@ -460,15 +463,25 @@ class NLayerDiscriminator(nn.Module):
         use_bias = False
         kw = 4
         padw = 0#1
-        sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
-                    nn.LeakyReLU(0.2, True)]
+        def conv_layer(input_nc, ndf, kernel_size, stride, padding, bias=True, with_specnorm=False):
+            conv = nn.Conv2d(input_nc, ndf, kernel_size, stride=stride, padding=padding, bias=bias)
+            if with_specnorm:
+                conv = SpectralNorm()(conv)
+            return conv
+
+        sequence = [
+            conv_layer(input_nc, ndf, kw, stride=2, padding=padw, with_specnorm=with_specnorm),
+            # nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
+            nn.LeakyReLU(0.2, True)]
         nf_mult = 1
         # nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)
             sequence += [
-                nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
+                conv_layer(ndf * nf_mult_prev, ndf * nf_mult, kw, stride=2, padding=padw,
+                           bias=use_bias, with_specnorm=with_specnorm)
+                # nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=2, padding=padw, bias=use_bias),
                 norm_layer(ndf * nf_mult),
                 nn.LeakyReLU(0.2, True)
             ]
@@ -476,13 +489,15 @@ class NLayerDiscriminator(nn.Module):
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequence += [
-            nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
+            conv_layer(ndf * nf_mult_prev, ndf * nf_mult, kw, stride=1, padding=padw,
+                       bias=use_bias, with_specnorm=with_specnorm)
+            # nn.Conv2d(ndf * nf_mult_prev, ndf * nf_mult, kernel_size=kw, stride=1, padding=padw, bias=use_bias),
             norm_layer(ndf * nf_mult),
             nn.LeakyReLU(0.2, True)
         ]
 
-#         sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]  # output 1 channel prediction map
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=3, stride=1, padding=padw)]  # output 1 channel prediction map
+        sequence += [conv_layer(ndf * nf_mult, 1, 3, stride=1, padding=padw, with_specnorm=False)]
+                # nn.Conv2d(ndf * nf_mult, 1, kernel_size=3, stride=1, padding=padw)]  # output 1 channel prediction map
         self.model = nn.Sequential(*sequence)
 
     def forward(self, input):

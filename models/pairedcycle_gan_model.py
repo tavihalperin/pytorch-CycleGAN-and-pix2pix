@@ -85,14 +85,15 @@ class PairedCycleGANModel(BaseModel):
                                         self.gpu_ids, res=not self.opt.no_res)
 
         if self.isTrain:  # define discriminators
-            self.netD_A = networks.define_D(opt.output_nc, opt.ndf, opt.netD,
-                                            opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
-            self.netD_B = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
-                                            opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain,
-                                            self.gpu_ids)
+            self.netD_A = networks.define_D(opt.output_nc, opt.ndf, opt.netD, opt.n_layers_D,
+                                            opt.norm, opt.init_type, opt.init_gain, self.gpu_ids,
+                                            opt.with_specnorm)
+            self.netD_B = networks.define_D(opt.input_nc, opt.ndf, opt.netD, opt.n_layers_D,
+                                            opt.norm, opt.init_type, opt.init_gain, self.gpu_ids,
+                                            opt.with_specnorm)
             self.netD_style = networks.define_D(opt.input_nc*2, opt.ndf, opt.netD,
-                                            opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain,
-                                            self.gpu_ids)
+                                                opt.n_layers_D, opt.norm, opt.init_type,
+                                                opt.init_gain, self.gpu_ids, opt.with_specnorm)
 
             self.fake_A_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
             self.fake_B_pool = ImagePoolPairs(opt.pool_size)  # create image buffer to store
