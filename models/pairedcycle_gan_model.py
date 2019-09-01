@@ -43,8 +43,8 @@ class PairedCycleGANModel(BaseModel):
             parser.add_argument('--lambda_style', type=float, default=1.0, help='style consistency loss')
             parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
             parser.add_argument('--lambda_identity', type=float, default=0.5, help='use identity mapping. Setting lambda_identity other than 0 has an effect of scaling the weight of the identity mapping loss. For example, if the weight of the identity loss should be 10 times smaller than the weight of the reconstruction loss, please set lambda_identity = 0.1')
-            parser.add_argument('--with_idt_B', action='store_true', help='use identity for B '
-                                                                          'domain')
+            parser.add_argument('--with_idt_B', action='store_true', help='use identity for B domain')
+            parser.add_argument('--with_specnorm', action='store_true', help='with specnorm')
 
         return parser
 
