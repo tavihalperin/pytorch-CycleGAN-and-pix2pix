@@ -26,7 +26,8 @@ from util.visualizer import Visualizer
 from collections import defaultdict
 # import numpy as np
 
-def cvnrg_linechart(chart_name, key, value, group=None):
+
+def cnvrg_linechart(chart_name, key, value, group=None):
    if group is None:
        print("cnvrg_linechart_{} key: '{}' value: '{}'".format(chart_name.replace(' ','_'), key, value))
    else:
@@ -104,8 +105,8 @@ if __name__ == '__main__':
 
             iter_data_time = time.time()
             
-        losses_sum = div_losses(losses_sum, iters_count_for_losses_sum)
-        
+        losses_mean = div_losses(losses_sum, iters_count_for_losses_sum)
+        cnvrg_plot(losses_mean, epoch)
         if epoch % opt.save_epoch_freq == 0:              # cache our model every <save_epoch_freq> epochs
             print('saving the model at the end of epoch %d, iters %d' % (epoch, total_iters))
             model.save_networks('latest')
