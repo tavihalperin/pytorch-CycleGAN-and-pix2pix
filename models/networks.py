@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import init
 import functools
 from torch.optim import lr_scheduler
-from torch.nn.utils.spectral_norm import SpectralNorm
+from torch.nn.utils import spectral_norm #import SpectralNorm
 
 ###############################################################################
 # Helper Functions
@@ -466,7 +466,8 @@ class NLayerDiscriminator(nn.Module):
         def conv_layer(input_nc, ndf, kernel_size, stride, padding, bias=True, with_specnorm=False):
             conv = nn.Conv2d(input_nc, ndf, kernel_size, stride=stride, padding=padding, bias=bias)
             if with_specnorm:
-                conv = SpectralNorm()(conv)
+                conv = spectral_norm(conv)
+                # conv = SpectralNorm()(conv)
             return conv
 
         sequence = [
