@@ -314,11 +314,11 @@ class DilatedResnetGeneratorG(nn.Module):
         self.no_res = not res
         self.layer1a = [nn.ReflectionPad2d(3),
                         nn.Conv2d(input_nc, ngf//2, kernel_size=7, padding=0, bias=use_bias),
-                        norm_layer(ngf),
+                        norm_layer(ngf//2),
                         nn.ReLU(True)]
         self.layer1b = [nn.ReflectionPad2d(3),
                         nn.Conv2d(input_nc, ngf//2, kernel_size=7, padding=0, bias=use_bias),
-                        norm_layer(ngf),
+                        norm_layer(ngf//2),
                         nn.ReLU(True)]
         self.layer1a = nn.Sequential(*self.layer1a)
         self.layer1b = nn.Sequential(*self.layer1b)
